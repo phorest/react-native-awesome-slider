@@ -1,4 +1,4 @@
-import React, { FC, useRef, useState } from 'react';
+import React, { FC, useRef } from 'react';
 import {
   Insets,
   LayoutChangeEvent,
@@ -125,6 +125,11 @@ export type AwesomeSliderProps = {
   renderBubble?: () => React.ReactNode;
 
   /**
+   * Flag to show/hide bubble
+   */
+  showBubble?: boolean;
+
+  /**
    * This function will be called while sliding, and should set the text inside your custom bubble.
    */
   setBubbleText?: (s: string) => void;
@@ -173,11 +178,10 @@ export type AwesomeSliderProps = {
   thumbScaleValue?: Animated.SharedValue<number>;
   panHitSlop?: Insets;
 
-  step?: number;
   /**
-   * withTiming options when step is defined. if false, no animation will be used. default false.
+   * If set to true, the slider will snap to nearest whole number when touch is released
    */
-  stepTimingOptions?: false | Animated.WithTimingConfig;
+  snapToInteger?: boolean;
   markStyle?: StyleProp<ViewStyle>;
   markWidth?: number;
   onHapticFeedback?: () => void;
@@ -185,6 +189,7 @@ export type AwesomeSliderProps = {
   theme?: SliderThemeType;
   /**
    * Current swipe direction
+   *
    * @enum Animated.SharedValue<PanDirectionEnum>
    */
   panDirectionValue?: Animated.SharedValue<PanDirectionEnum>;
@@ -219,7 +224,6 @@ export const Slider: FC<AwesomeSliderProps> = ({
   disableTrackFollow = false,
   hapticMode = 'none',
   isScrubbing,
-  markStyle,
   markWidth = 4,
   maximumValue,
   minimumValue,
@@ -235,8 +239,8 @@ export const Slider: FC<AwesomeSliderProps> = ({
   renderThumb,
   setBubbleText,
   sliderHeight = 5,
-  step,
-  stepTimingOptions = false,
+  snapToInteger = false,
+  showBubble = false,
   style,
   testID,
   theme,
@@ -245,8 +249,6 @@ export const Slider: FC<AwesomeSliderProps> = ({
 }) => {
   const bubbleRef = useRef<BubbleRef>(null);
   const prevX = useSharedValue(0);
-
-  const [sliderWidth, setSliderWidth] = useState(0);
   const width = useSharedValue(0);
   const thumbValue = useSharedValue(0);
   const bubbleOpacity = useSharedValue(0);
@@ -272,30 +274,19 @@ export const Slider: FC<AwesomeSliderProps> = ({
   };
 
   const animatedSeekStyle = useAnimatedStyle(() => {
-    let seekWidth = 0;
     // when you set step
-    if (step && markLeftArr.value.length >= step) {
-      seekWidth = markLeftArr.value[thumbIndex.value] + thumbWidth / 2;
-    } else {
-      seekWidth = progressToValue(progress.value) + thumbWidth / 2;
-    }
+
+    const seekWidth = progressToValue(progress.value) + thumbWidth / 2;
 
     return {
-      width:
-        step && stepTimingOptions
-          ? withTiming(clamp(seekWidth, 0, width.value), stepTimingOptions)
-          : clamp(seekWidth, 0, width.value),
+      width: clamp(seekWidth, 0, width.value),
     };
   }, [progress, minimumValue, maximumValue, width, markLeftArr]);
 
   const animatedThumbStyle = useAnimatedStyle(() => {
     let translateX = 0;
-    // when you set step
-    if (step && markLeftArr.value.length >= step) {
-      translateX = stepTimingOptions
-        ? withTiming(markLeftArr.value[thumbIndex.value], stepTimingOptions)
-        : markLeftArr.value[thumbIndex.value];
-    } else if (disableTrackFollow) {
+
+    if (disableTrackFollow) {
       translateX = clamp(thumbValue.value, 0, width.value - thumbWidth);
     } else {
       translateX = clamp(
@@ -319,13 +310,8 @@ export const Slider: FC<AwesomeSliderProps> = ({
   }, [progress, minimumValue, maximumValue, width.value]);
 
   const animatedBubbleStyle = useAnimatedStyle(() => {
-    let translateX = 0;
-    // when you set step
-    if (step && markLeftArr.value.length >= step) {
-      translateX = markLeftArr.value[thumbIndex.value] + thumbWidth / 2;
-    } else {
-      translateX = thumbValue.value + thumbWidth / 2;
-    }
+    const translateX = thumbValue.value + thumbWidth / 2;
+
     return {
       opacity: bubbleOpacity.value,
       transform: [
@@ -333,21 +319,11 @@ export const Slider: FC<AwesomeSliderProps> = ({
           translateY: bubbleTranslateY,
         },
         {
-          translateX:
-            step && stepTimingOptions
-              ? withTiming(
-                  clamp(
-                    translateX,
-                    bubbleWidth / 2,
-                    width.value - bubbleWidth / 2,
-                  ),
-                  stepTimingOptions,
-                )
-              : clamp(
-                  translateX,
-                  bubbleWidth / 2,
-                  width.value - bubbleWidth / 2,
-                ),
+          translateX: clamp(
+            translateX,
+            bubbleWidth / 2,
+            width.value - bubbleWidth / 2,
+          ),
         },
         {
           scale: bubbleOpacity.value,
@@ -370,49 +346,41 @@ export const Slider: FC<AwesomeSliderProps> = ({
     const bubbleText = bubble ? bubble?.(seconds) : formatSeconds(seconds);
     onValueChange?.(seconds);
 
-    setBubbleText
-      ? setBubbleText(bubbleText)
-      : bubbleRef.current?.setText(bubbleText);
+    if (setBubbleText) {
+      setBubbleText(bubbleText);
+    } else {
+      bubbleRef.current?.setText(bubbleText);
+    }
   };
 
   /**
    * convert Sharevalue to callback seconds
+   *
    * @returns number
    */
   const shareValueToSeconds = () => {
     'worklet';
-    if (step) {
-      return clamp(
-        minimumValue.value +
-          (thumbIndex.value / step) * (maximumValue.value - minimumValue.value),
-        minimumValue.value,
-        maximumValue.value,
-      );
-    } else {
-      const sliderPercent = clamp(
-        thumbValue.value / (width.value - thumbWidth) +
-          minimumValue.value / sliderTotalValue(),
-        0,
-        1,
-      );
-      return clamp(
-        sliderPercent * sliderTotalValue(),
-        minimumValue.value,
-        maximumValue.value,
-      );
-    }
+
+    const sliderPercent = clamp(
+      thumbValue.value / (width.value - thumbWidth) +
+        minimumValue.value / sliderTotalValue(),
+      0,
+      1,
+    );
+    return clamp(
+      sliderPercent * sliderTotalValue(),
+      minimumValue.value,
+      maximumValue.value,
+    );
   };
   /**
    * convert [x] position to progress
+   *
    * @returns number
    */
   const xToProgress = (x: number) => {
     'worklet';
-    if (step && markLeftArr.value.length >= step) {
-      return markLeftArr.value[thumbIndex.value];
-    } else {
-      return (x / (width.value - thumbWidth)) * sliderTotalValue();
-    }
+    return (x / (width.value - thumbWidth)) * sliderTotalValue();
   };
 
   /**
@@ -423,57 +391,25 @@ export const Slider: FC<AwesomeSliderProps> = ({
     if (isScrubbing) {
       isScrubbing.value = true;
     }
-    if (step) {
-      const index = markLeftArr.value.findIndex(item => item >= x);
-      const arrNext = markLeftArr.value[index];
-      const arrPrev = markLeftArr.value[index - 1];
-      // Computing step boundaries
-      const currentX = (arrNext + arrPrev) / 2;
-      const thumbIndexPrev = thumbIndex.value;
-      if (x - thumbWidth / 2 > currentX) {
-        thumbIndex.value = index;
-      } else {
-        if (index - 1 === -1) {
-          thumbIndex.value === 0;
-        } else if (index - 1 < -1) {
-          thumbIndex.value = step;
-        } else {
-          thumbIndex.value = index - 1;
-        }
-      }
-      // Determine trigger haptics callback
+
+    thumbValue.value = clamp(x, 0, width.value - thumbWidth);
+    if (!disableTrackFollow) {
+      progress.value = xToProgress(x);
+    }
+    // Determines whether the thumb slides to both ends
+    if (x <= 0 || x >= width.value - thumbWidth) {
       if (
-        thumbIndexPrev !== thumbIndex.value &&
-        hapticMode === HapticModeEnum.STEP &&
+        !isTriggedHaptic.value &&
+        hapticMode === HapticModeEnum.BOTH &&
         onHapticFeedback
       ) {
         runOnJS(onHapticFeedback)();
         isTriggedHaptic.value = true;
-      } else {
-        isTriggedHaptic.value = false;
       }
-
-      runOnJS(onSlideAcitve)(shareValueToSeconds());
     } else {
-      thumbValue.value = clamp(x, 0, width.value - thumbWidth);
-      if (!disableTrackFollow) {
-        progress.value = xToProgress(x);
-      }
-      // Determines whether the thumb slides to both ends
-      if (x <= 0 || x >= width.value - thumbWidth) {
-        if (
-          !isTriggedHaptic.value &&
-          hapticMode === HapticModeEnum.BOTH &&
-          onHapticFeedback
-        ) {
-          runOnJS(onHapticFeedback)();
-          isTriggedHaptic.value = true;
-        }
-      } else {
-        isTriggedHaptic.value = false;
-      }
-      runOnJS(onSlideAcitve)(shareValueToSeconds());
+      isTriggedHaptic.value = false;
     }
+    runOnJS(onSlideAcitve)(shareValueToSeconds());
   };
 
   const onGestureEvent = Gesture.Pan()
@@ -522,7 +458,14 @@ export const Slider: FC<AwesomeSliderProps> = ({
       if (disableTrackFollow) {
         progress.value = xToProgress(x);
       }
-      if (onSlidingComplete) {
+
+      if (snapToInteger && progress.value % 1 !== 0) {
+        const roundedValue = Math.round(progress.value);
+        progress.value = roundedValue;
+        if (onSlidingComplete) {
+          runOnJS(onSlidingComplete)(roundedValue);
+        }
+      } else if (onSlidingComplete) {
         runOnJS(onSlidingComplete)(shareValueToSeconds());
       }
     });
@@ -542,7 +485,13 @@ export const Slider: FC<AwesomeSliderProps> = ({
         isScrubbing.value = true;
       }
       bubbleOpacity.value = withSpring(0);
-      if (onSlidingComplete) {
+      if (snapToInteger && progress.value % 1 !== 0) {
+        const roundedValue = Math.round(progress.value);
+        progress.value = roundedValue;
+        if (onSlidingComplete) {
+          runOnJS(onSlidingComplete)(roundedValue);
+        }
+      } else if (onSlidingComplete) {
         runOnJS(onSlidingComplete)(shareValueToSeconds());
       }
     });
@@ -552,80 +501,43 @@ export const Slider: FC<AwesomeSliderProps> = ({
   // setting markLeftArr
   useAnimatedReaction(
     () => {
-      if (!step) {
-        return [];
-      }
-      return new Array(step + 1).fill(0).map((_, i) => {
-        return (
-          Math.round(width.value * (i / step)) -
-          (i / step) * markWidth -
-          Math.round(thumbWidth / 3)
-        );
-      });
+      return [];
     },
     data => {
       markLeftArr.value = data;
     },
-    [thumbWidth, markWidth, step, progress, width],
+    [thumbWidth, markWidth, progress, width],
   );
 
   // setting thumbIndex
   useAnimatedReaction(
     () => {
-      if (isScrubbing && isScrubbing.value) {
-        return undefined;
-      }
-      if (!step) {
-        return undefined;
-      }
-      const marksLeft = new Array(step + 1)
-        .fill(0)
-        .map((_, i) => Math.round(width.value * (i / step)));
-
-      // current positon width
-      const currentWidth = Math.round(
-        ((progress.value - minimumValue.value) /
-          (maximumValue.value - minimumValue.value)) *
-          width.value,
-      );
-
-      const currentIndex = marksLeft.findIndex(value => value >= currentWidth);
-      return clamp(currentIndex, 0, step);
+      return undefined;
     },
     data => {
       if (data !== undefined) {
         thumbIndex.value = data;
       }
     },
-    [isScrubbing, maximumValue, minimumValue, step, progress, width],
+    [isScrubbing, maximumValue, minimumValue, progress, width],
   );
 
   // setting thumbValue
   useAnimatedReaction(
     () => {
-      if (isScrubbing && isScrubbing.value) {
-        return undefined;
-      }
-      if (step) {
-        return undefined;
-      }
-      const currentValue =
-        (progress.value / (minimumValue.value + maximumValue.value)) *
-        width.value;
-      return clamp(currentValue, 0, width.value - thumbWidth);
+      return undefined;
     },
     data => {
       if (data !== undefined) {
         thumbValue.value = data;
       }
     },
-    [thumbWidth, maximumValue, minimumValue, step, progress, width],
+    [thumbWidth, maximumValue, minimumValue, progress, width],
   );
 
   const onLayout = ({ nativeEvent }: LayoutChangeEvent) => {
     const layoutWidth = nativeEvent.layout.width;
     width.value = layoutWidth;
-    setSliderWidth(layoutWidth);
   };
 
   return (
@@ -634,7 +546,7 @@ export const Slider: FC<AwesomeSliderProps> = ({
         testID={testID}
         style={[styles.view, { height: sliderHeight }, style]}
         hitSlop={panHitSlop}
-        onLayout={onLayout}>
+        onLayout={onLayout as any}>
         <Animated.View
           style={StyleSheet.flatten([
             styles.slider,
@@ -665,24 +577,6 @@ export const Slider: FC<AwesomeSliderProps> = ({
             ]}
           />
         </Animated.View>
-        {sliderWidth > 0 &&
-          step &&
-          new Array(step + 1).fill(0).map((_, i) => {
-            return (
-              <View
-                key={i}
-                style={[
-                  styles.mark,
-                  {
-                    width: markWidth,
-                    borderRadius: markWidth,
-                    left: sliderWidth * (i / step) - (i / step) * markWidth,
-                  },
-                  markStyle,
-                ]}
-              />
-            );
-          })}
         <Animated.View style={[styles.thumb, animatedThumbStyle]}>
           {renderThumb ? (
             renderThumb()
@@ -697,33 +591,35 @@ export const Slider: FC<AwesomeSliderProps> = ({
             />
           )}
         </Animated.View>
-
-        <Animated.View
-          style={[
-            styles.bubble,
-            {
-              left: -bubbleMaxWidth / 2,
-              width: bubbleMaxWidth,
-            },
-            animatedBubbleStyle,
-          ]}>
-          {renderBubble ? (
-            renderBubble()
-          ) : (
-            <Bubble
-              ref={bubbleRef}
-              color={_theme.bubbleBackgroundColor}
-              textColor={_theme.bubbleTextColor}
-              textStyle={bubbleTextStyle}
-              containerStyle={bubbleContainerStyle}
-              bubbleMaxWidth={bubbleMaxWidth}
-            />
-          )}
-        </Animated.View>
+        {showBubble && (
+          <Animated.View
+            style={[
+              styles.bubble,
+              {
+                left: -bubbleMaxWidth / 2,
+                width: bubbleMaxWidth,
+              },
+              animatedBubbleStyle,
+            ]}>
+            {renderBubble ? (
+              renderBubble()
+            ) : (
+              <Bubble
+                ref={bubbleRef}
+                color={_theme.bubbleBackgroundColor}
+                textColor={_theme.bubbleTextColor}
+                textStyle={bubbleTextStyle}
+                containerStyle={bubbleContainerStyle}
+                bubbleMaxWidth={bubbleMaxWidth}
+              />
+            )}
+          </Animated.View>
+        )}
       </Animated.View>
     </GestureDetector>
   );
 };
+
 const styles = StyleSheet.create({
   slider: {
     width: '100%',
