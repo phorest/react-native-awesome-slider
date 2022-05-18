@@ -146,9 +146,9 @@ export type AwesomeSliderProps = {
    */
   labelTextForIndex?: (labelIndex: number) => string;
 
-  labelStyle?: StyleProp<ViewStyle>;
+  labelStyle?: StyleProp<TextStyle>;
 
-  labelOffset: number;
+  labelOffset?: number;
 
   /**
    * Thumb elements width, default 15
