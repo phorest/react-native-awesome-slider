@@ -12,7 +12,7 @@ import {
   View,
   ViewStyle,
 } from 'react-native';
-import { GestureDetector, Gesture } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   runOnJS,
   useAnimatedReaction,
@@ -20,6 +20,7 @@ import Animated, {
   useSharedValue,
   withSpring,
   withTiming,
+  WithTimingConfig,
 } from 'react-native-reanimated';
 
 const formatSeconds = (second: number) => `${Math.round(second * 100) / 100}`;
@@ -40,31 +41,31 @@ export enum PanDirectionEnum {
 }
 export type SliderThemeType =
   | {
-  /**
-   * Color to fill the progress in the seekbar
-   */
-  minimumTrackTintColor?: string;
-  /**
-   * Color to fill the background in the seekbar
-   */
-  maximumTrackTintColor?: string;
-  /**
-   * Color to fill the cache in the seekbar
-   */
-  cacheTrackTintColor?: string;
-  /**
-   * Color to fill the bubble backgrouundColor
-   */
-  bubbleBackgroundColor?: string;
-  /**
-   * Bubble text color
-   */
-  bubbleTextColor?: string;
-  /**
-   * Disabled color to fill the progress in the seekbar
-   */
-  disableMinTrackTintColor?: string;
-}
+      /**
+       * Color to fill the progress in the seekbar
+       */
+      minimumTrackTintColor?: string;
+      /**
+       * Color to fill the background in the seekbar
+       */
+      maximumTrackTintColor?: string;
+      /**
+       * Color to fill the cache in the seekbar
+       */
+      cacheTrackTintColor?: string;
+      /**
+       * Color to fill the bubble backgrouundColor
+       */
+      bubbleBackgroundColor?: string;
+      /**
+       * Bubble text color
+       */
+      bubbleTextColor?: string;
+      /**
+       * Disabled color to fill the progress in the seekbar
+       */
+      disableMinTrackTintColor?: string;
+    }
   | null
   | undefined;
 
@@ -188,7 +189,7 @@ export type AwesomeSliderProps = {
   /**
    * withTiming options when step is defined. if false, no animation will be used. default false.
    */
-  stepTimingOptions?: false | Animated.WithTimingConfig;
+  stepTimingOptions?: false | WithTimingConfig;
   markStyle?: StyleProp<ViewStyle>;
   markWidth?: number;
   onHapticFeedback?: () => void;
@@ -217,46 +218,46 @@ const defaultTheme: SliderThemeType = {
   bubbleTextColor: palette.White,
 };
 export const Slider: FC<AwesomeSliderProps> = ({
-                                                 bubble,
-                                                 bubbleContainerStyle,
-                                                 bubbleMaxWidth = 100,
-                                                 bubbleTextStyle,
-                                                 bubbleTranslateY = -25,
-                                                 bubbleWidth = 0,
-                                                 cache,
-                                                 containerStyle,
-                                                 disable = false,
-                                                 disableTapEvent = false,
-                                                 disableTrackFollow = false,
-                                                 hapticMode = 'none',
-                                                 isScrubbing,
-                                                 markStyle,
-                                                 markWidth = 4,
-                                                 maximumValue,
-                                                 minimumValue,
-                                                 onHapticFeedback,
-                                                 onSlidingComplete,
-                                                 onSlidingStart,
-                                                 onTap,
-                                                 onValueChange,
-                                                 panDirectionValue,
-                                                 panHitSlop = hitSlop,
-                                                 progress,
-                                                 renderBubble,
-                                                 renderThumb,
-                                                 setBubbleText,
-                                                 sliderHeight = 5,
-                                                 step,
-                                                 stepTimingOptions = false,
-                                                 style,
-                                                 testID,
-                                                 theme,
-                                                 thumbScaleValue,
-                                                 thumbWidth = 15,
-                                                 labelTextForIndex,
-                                                 labelStyle,
-                                                 labelOffset = 0,
-                                               }) => {
+  bubble,
+  bubbleContainerStyle,
+  bubbleMaxWidth = 100,
+  bubbleTextStyle,
+  bubbleTranslateY = -25,
+  bubbleWidth = 0,
+  cache,
+  containerStyle,
+  disable = false,
+  disableTapEvent = false,
+  disableTrackFollow = false,
+  hapticMode = 'none',
+  isScrubbing,
+  markStyle,
+  markWidth = 4,
+  maximumValue,
+  minimumValue,
+  onHapticFeedback,
+  onSlidingComplete,
+  onSlidingStart,
+  onTap,
+  onValueChange,
+  panDirectionValue,
+  panHitSlop = hitSlop,
+  progress,
+  renderBubble,
+  renderThumb,
+  setBubbleText,
+  sliderHeight = 5,
+  step,
+  stepTimingOptions = false,
+  style,
+  testID,
+  theme,
+  thumbScaleValue,
+  thumbWidth = 15,
+  labelTextForIndex,
+  labelStyle,
+  labelOffset = 0,
+}) => {
   const bubbleRef = useRef<BubbleRef>(null);
   const prevX = useSharedValue(0);
 
@@ -273,6 +274,7 @@ export const Slider: FC<AwesomeSliderProps> = ({
   };
 
   const getMarkStyles = () => {
+    'worklet';
     const animatedMarks = [];
     for (let index = 0; index < (step ?? 0) + 1; index++) {
       animatedMarks.push({
@@ -356,18 +358,18 @@ export const Slider: FC<AwesomeSliderProps> = ({
           translateX:
             step && stepTimingOptions
               ? withTiming(
-                clamp(
+                  clamp(
+                    translateX,
+                    bubbleWidth / 2,
+                    width.value - bubbleWidth / 2,
+                  ),
+                  stepTimingOptions,
+                )
+              : clamp(
                   translateX,
                   bubbleWidth / 2,
                   width.value - bubbleWidth / 2,
                 ),
-                stepTimingOptions,
-              )
-              : clamp(
-                translateX,
-                bubbleWidth / 2,
-                width.value - bubbleWidth / 2,
-              ),
         },
         {
           scale: bubbleOpacity.value,
@@ -404,7 +406,7 @@ export const Slider: FC<AwesomeSliderProps> = ({
 
     const sliderPercent = clamp(
       thumbValue.value / (width.value - thumbWidth) +
-      minimumValue.value / sliderTotalValue(),
+        minimumValue.value / sliderTotalValue(),
       0,
       1,
     );
@@ -421,7 +423,11 @@ export const Slider: FC<AwesomeSliderProps> = ({
   const xToProgress = (x: number) => {
     'worklet';
     if (step && markLeftArr.value.length >= step) {
-      return markLeftArr.value[thumbIndex.value];
+      if (markLeftArr.value[thumbIndex.value] > 0) {
+        return markLeftArr.value[thumbIndex.value];
+      } else {
+        return progress.value;
+      }
     } else {
       return (x / (width.value - thumbWidth)) * sliderTotalValue();
     }
@@ -437,9 +443,6 @@ export const Slider: FC<AwesomeSliderProps> = ({
     }
 
     thumbValue.value = clamp(x, 0, width.value - thumbWidth);
-    if (!disableTrackFollow) {
-      progress.value = xToProgress(x);
-    }
     // Determines whether the thumb slides to both ends
     if (x <= 0 || x >= width.value - thumbWidth) {
       if (
@@ -454,7 +457,6 @@ export const Slider: FC<AwesomeSliderProps> = ({
       isTriggedHaptic.value = false;
     }
     runOnJS(onSlideAcitve)(shareValueToSeconds());
-    runOnJS(setMarkStyles)(getMarkStyles());
   };
 
   const onGestureEvent = Gesture.Pan()
@@ -581,7 +583,7 @@ export const Slider: FC<AwesomeSliderProps> = ({
       const currentWidth = Math.round(
         ((progress.value - minimumValue.value) /
           (maximumValue.value - minimumValue.value)) *
-        width.value,
+          width.value,
       );
 
       const currentIndex = marksLeft.findIndex(value => value >= currentWidth);
