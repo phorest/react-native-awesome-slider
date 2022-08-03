@@ -1,7 +1,7 @@
 import { Bubble, BubbleRef } from './ballon';
 import { palette } from './theme/palette';
 import { clamp } from './utils';
-import React, { FC, useRef, useState } from 'react';
+import React, { FC, Fragment, useRef, useState } from 'react';
 import {
   Insets,
   LayoutChangeEvent,
@@ -667,9 +667,8 @@ export const Slider: FC<AwesomeSliderProps> = ({
           new Array(step + 1).fill(0).map((_, i) => {
             const left = sliderWidth * (i / step) - (i / step) * markWidth;
             return (
-              <>
+              <Fragment key={i}>
                 <View
-                  key={i}
                   style={[
                     styles.mark,
                     {
@@ -690,7 +689,7 @@ export const Slider: FC<AwesomeSliderProps> = ({
                     {labelTextForIndex(i)}
                   </Text>
                 )}
-              </>
+              </Fragment>
             );
           })}
         <Animated.View style={[styles.thumb, animatedThumbStyle]}>
